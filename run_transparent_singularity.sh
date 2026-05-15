@@ -197,10 +197,10 @@ else
           container_pull="aria2c $aria_args"
        fi # end of aria2c check
    else # end of check if files exist in object storage
-      # fallback to docker
-      echo "$container does not exist in any cache - loading from docker!"
-      storage="docker"
-      container_pull="singularity pull --name $container docker://vnmd/${containerName}_${containerVersion}:${containerDate}"
+      # Fallback to docker pull from GHCR if not found in any cache
+      echo "$container does not exist in any cache - loading from GHCR docker!"
+      storage="ghcr-docker"
+      container_pull="apptainer pull --name $container docker://ghcr.io/neurodesk/${containerName}:${containerVersion}_${containerDate}"
    fi
 fi
 
