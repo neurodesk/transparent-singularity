@@ -125,7 +125,39 @@ if  [[ -z "$CVMFS_DISABLE" ]] && [[ -d "/cvmfs/neurodesk.ardc.edu.au/containers/
    storage="cvmfs"
    container_pull="ln -s /cvmfs/neurodesk.ardc.edu.au/containers/${containerName}_${containerVersion}_${containerDate}/${containerName}_${containerVersion}_${containerDate}.simg $container"
 else
-   echo "$container does not exists in cvmfs. Testing Nectar temporary Object storage next: "
+   # Pull SIF artifact from quay.io via OCI 1.1 Referrers API
+   echo "checking if $container is published as v2 OCI on Quay ..."
+   ts_quay_repo="neurodesk/${containerName}"
+   ts_docker_tag="${containerVersion}_${containerDate}"
+   ts_sif_digest=""
+   ts_sif_mediatype="application/vnd.sylabs.sif.layer.v1.sif"
+
+   if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+      ts_token=$(curl -sL \
+         "https://quay.io/v2/auth?service=quay.io&scope=repository:${ts_quay_repo}:pull" 2>/dev/null \
+         | jq -r '.token // empty')
+      if [ -n "$ts_token" ] && [ "$ts_token" != "null" ]; then
+         ts_docker_digest=$(curl -sIL -H "Authorization: Bearer $ts_token" \
+            -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
+            "https://quay.io/v2/${ts_quay_repo}/manifests/${ts_docker_tag}" 2>/dev/null \
+            | awk 'tolower($1)=="docker-content-digest:" {print $2}' | tr -d '\r')
+         if [ -n "$ts_docker_digest" ]; then
+            ts_sif_digest=$(curl -sL -H "Authorization: Bearer $ts_token" \
+               "https://quay.io/v2/${ts_quay_repo}/referrers/${ts_docker_digest}?artifactType=${ts_sif_mediatype}" 2>/dev/null \
+               | jq -r '.manifests[0].digest // empty')
+         fi
+      fi
+   fi
+
+   if [ -n "$ts_sif_digest" ] && [ "$ts_sif_digest" != "null" ]; then
+      echo "  found v2 SIF on Quay: $ts_sif_digest"
+      storage="quay-v2"
+      container_pull="apptainer pull --name $container oras://quay.io/${ts_quay_repo}@${ts_sif_digest}"
+   fi
+fi
+
+if [ -z "$storage" ]; then
+   echo "$container does not exist in cvmfs or v2 oras. Testing Nectar temporary Object storage next: "
    if curl --output /dev/null --silent --head --fail "https://object-store.rc.nectar.org.au/v1/AUTH_dead991e1fa847e3afcca2d3a7041f5d/neurodesk/temporary-builds-new/$container"; then      
       echo "$container exists in the temporary builds nectar cache"
       url_nectar="https://object-store.rc.nectar.org.au/v1/AUTH_dead991e1fa847e3afcca2d3a7041f5d/neurodesk/temporary-builds-new/"
