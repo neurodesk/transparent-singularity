@@ -66,7 +66,13 @@ case "$1" in
         exit 0
         ;;
     exec)
-        exit 98
+        if [[ "$*" == *" cat /README.md" ]]; then
+            exit 1
+        fi
+        if [[ "$*" == *"ts_binaryFinder.sh"* ]]; then
+            exit 98
+        fi
+        exit 0
         ;;
     version)
         echo "3.10.0"
@@ -95,9 +101,9 @@ if [[ "$introspection_status" -eq 0 ]]; then
     echo "$introspection_output" >&2
     fail "Failed container introspection unexpectedly succeeded."
 fi
-if [[ "$introspection_output" != *"Could not read /README.md"* ]]; then
+if [[ "$introspection_output" != *"Could not inspect executables"* ]]; then
     echo "$introspection_output" >&2
-    fail "Failed container introspection did not stop before modulefile creation."
+    fail "Failed container introspection did not report the executable discovery error."
 fi
 assert_no_modulefile "$introspection_root"
 

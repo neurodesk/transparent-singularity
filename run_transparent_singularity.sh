@@ -252,7 +252,8 @@ rm -f README.md commands.txt commands_raw.txt env.txt
 echo "checking if there is a README.md file in the container"
 echo "executing: singularity exec $singularity_opts --pwd $_base $container cat /README.md"
 if ! singularity exec $singularity_opts --pwd $_base $container cat /README.md > README.md; then
-   fail "Could not read /README.md from container '${container}'. Not creating wrapper or module files."
+   echo "[WARN] run_transparent_singularity.sh: Could not read /README.md from container '${container}'. Continuing with empty module help." >&2
+   : > README.md
 fi
 
 echo "checking which executables exist inside container"
