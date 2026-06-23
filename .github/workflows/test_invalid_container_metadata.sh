@@ -52,6 +52,38 @@ if [[ "$invalid_output" != *"Container name must match name_version_YYYYMMDD"* ]
 fi
 assert_no_modulefile "$invalid_root"
 
+binary_finder_root="$workdir/binary-finder"
+binary_finder_bin="$binary_finder_root/bin"
+mkdir -p "$binary_finder_bin"
+copy_runtime "$binary_finder_root"
+cat > "$binary_finder_bin/itksnap" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$binary_finder_bin/itksnap"
+
+set +e
+binary_finder_output="$(
+    cd "$binary_finder_root" &&
+    env -i PATH="/usr/bin:/bin" DEPLOY_PATH="$binary_finder_bin" DEPLOY_BINS="" bash ./ts_binaryFinder.sh 2>&1
+)"
+binary_finder_status=$?
+set -e
+
+if [[ "$binary_finder_status" -ne 0 ]]; then
+    echo "$binary_finder_output" >&2
+    fail "Binary finder failed when no DEPLOY_ENV variables were present."
+fi
+if [[ "$(cat "$binary_finder_root/commands.txt")" != "itksnap" ]]; then
+    echo "$binary_finder_output" >&2
+    cat "$binary_finder_root/commands.txt" >&2
+    fail "Binary finder did not write the expected command."
+fi
+if [[ -s "$binary_finder_root/env.txt" ]]; then
+    cat "$binary_finder_root/env.txt" >&2
+    fail "Binary finder should write an empty env.txt when no DEPLOY_ENV variables are present."
+fi
+
 introspection_root="$workdir/introspection"
 introspection_container_dir="$introspection_root/containers/brainvisa_6.0.36_20260613"
 copy_runtime "$introspection_container_dir"
