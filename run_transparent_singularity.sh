@@ -119,6 +119,14 @@ if [[  ${#qq} -lt 1 ]]; then
    exit 2
 fi
 
+# Select the container runtime for image pulls. Both apptainer and SingularityCE
+# support oras:// and docker:// pulls, so use whichever is on the PATH (prefer apptainer).
+if command -v apptainer >/dev/null 2>&1; then
+   container_runtime="apptainer"
+else
+   container_runtime="singularity"
+fi
+
 echo "checking if $container exists in the cvmfs cache ..."
 if  [[ -z "$CVMFS_DISABLE" ]] && [[ -d "/cvmfs/neurodesk.ardc.edu.au/containers/${containerName}_${containerVersion}_${containerDate}/${containerName}_${containerVersion}_${containerDate}.simg" ]]; then
    echo "$container exists in cvmfs"
@@ -152,7 +160,7 @@ else
    if [ -n "$ts_sif_digest" ] && [ "$ts_sif_digest" != "null" ]; then
       echo "  found v2 SIF on Quay: $ts_sif_digest"
       storage="quay-v2"
-      container_pull="apptainer pull --name $container oras://quay.io/${ts_quay_repo}@${ts_sif_digest}"
+      container_pull="$container_runtime pull --name $container oras://quay.io/${ts_quay_repo}@${ts_sif_digest}"
    fi
 fi
 
@@ -184,7 +192,7 @@ if [ -z "$storage" ]; then
    if [ -n "$ts_sif_digest" ] && [ "$ts_sif_digest" != "null" ]; then
       echo "  found v2 SIF on GHCR: $ts_sif_digest"
       storage="ghcr-v2"
-      container_pull="apptainer pull --name $container oras://ghcr.io/${ts_ghcr_repo}@${ts_sif_digest}"
+      container_pull="$container_runtime pull --name $container oras://ghcr.io/${ts_ghcr_repo}@${ts_sif_digest}"
    fi
 fi
 
@@ -271,11 +279,11 @@ if [ -z "$storage" ]; then
             "https://quay.io/v2/neurodesk/${containerName}/manifests/${ts_docker_tag}" 2>/dev/null; then
          echo "  docker pull from Quay"
          storage="quay-docker"
-         container_pull="apptainer pull --name $container docker://quay.io/neurodesk/${containerName}:${ts_docker_tag}"
+         container_pull="$container_runtime pull --name $container docker://quay.io/neurodesk/${containerName}:${ts_docker_tag}"
       else
          echo "  docker pull from GHCR"
          storage="ghcr-docker"
-         container_pull="apptainer pull --name $container docker://ghcr.io/neurodesk/${containerName}:${ts_docker_tag}"
+         container_pull="$container_runtime pull --name $container docker://ghcr.io/neurodesk/${containerName}:${ts_docker_tag}"
       fi
    fi
 fi
